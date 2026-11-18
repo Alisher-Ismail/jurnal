@@ -1,2 +1,9 @@
 User-agent: *
-Disallow:
+Disallow: /public/panel
+Disallow: /public/login
+Disallow: /public/track
+Disallow: /public/papers/
+Disallow: /public/cron/
+Disallow: /public/telegram/
+
+Sitemap: https://journal.emro.uz/public/sitemap.xml

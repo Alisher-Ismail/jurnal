@@ -13,6 +13,11 @@ return new class extends Migration
      */
     public function up()
     {
+        // Production tables may already exist (created from an SQL dump); never fail on them.
+        if (Schema::hasTable('password_resets')) {
+            return;
+        }
+
         Schema::create('password_resets', function (Blueprint $table) {
             $table->string('email')->primary();
             $table->string('token');

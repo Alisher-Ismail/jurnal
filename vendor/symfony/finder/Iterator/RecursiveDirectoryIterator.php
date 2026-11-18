@@ -18,11 +18,14 @@ use Symfony\Component\Finder\SplFileInfo;
  * Extends the \RecursiveDirectoryIterator to support relative paths.
  *
  * @author Victor Berchet <victor@suumit.com>
+ *
+ * @extends \RecursiveDirectoryIterator<string, SplFileInfo>
  */
 class RecursiveDirectoryIterator extends \RecursiveDirectoryIterator
 {
     private bool $ignoreUnreadableDirs;
-    private ?bool $rewindable = null;
+    private bool $ignoreFirstRewind = true;
+    private array $realPaths = [];
 
     // these 3 properties take part of the performance optimization to avoid redoing the same work in all iterations
     private string $rootPath;
@@ -44,6 +47,9 @@ class RecursiveDirectoryIterator extends \RecursiveDirectoryIterator
         if ('/' !== \DIRECTORY_SEPARATOR && !($flags & self::UNIX_PATHS)) {
             $this->directorySeparator = \DIRECTORY_SEPARATOR;
         }
+        if ($flags & self::FOLLOW_SYMLINKS && false !== ($realPath = realpath($path))) {
+            $this->realPaths[$realPath] = true;
+        }
     }
 
     /**
@@ -61,8 +67,9 @@ class RecursiveDirectoryIterator extends \RecursiveDirectoryIterator
             $subPathname .= $this->directorySeparator;
         }
         $subPathname .= $this->getFilename();
+        $basePath = $this->rootPath;
 
-        if ('/' !== $basePath = $this->rootPath) {
+        if ('/' !== $basePath && !str_ends_with($basePath, $this->directorySeparator) && !str_ends_with($basePath, '/')) {
             $basePath .= $this->directorySeparator;
         }
 
@@ -73,6 +80,11 @@ class RecursiveDirectoryIterator extends \RecursiveDirectoryIterator
     {
         $hasChildren = parent::hasChildren($allowLinks);
 
+        // don't loop on a directory that resolves to one of its parents
+        if ($hasChildren && $this->realPaths && false !== ($realPath = realpath($this->getPathname())) && isset($this->realPaths[$realPath])) {
+            return false;
+        }
+
         if (!$hasChildren || !$this->ignoreUnreadableDirs) {
             return $hasChildren;
         }
@@ -81,7 +93,7 @@ class RecursiveDirectoryIterator extends \RecursiveDirectoryIterator
             parent::getChildren();
 
             return true;
-        } catch (\UnexpectedValueException $e) {
+        } catch (\UnexpectedValueException) {
             // If directory is unreadable and finder is set to ignore it, skip children
             return false;
         }
@@ -100,8 +112,9 @@ class RecursiveDirectoryIterator extends \RecursiveDirectoryIterator
                 $children->ignoreUnreadableDirs = $this->ignoreUnreadableDirs;
 
                 // performance optimization to avoid redoing the same work in all children
-                $children->rewindable = &$this->rewindable;
                 $children->rootPath = $this->rootPath;
+
+                $children->realPaths += $this->realPaths;
             }
 
             return $children;
@@ -110,36 +123,23 @@ class RecursiveDirectoryIterator extends \RecursiveDirectoryIterator
         }
     }
 
-    /**
-     * Do nothing for non rewindable stream.
-     */
+    public function next(): void
+    {
+        $this->ignoreFirstRewind = false;
+
+        parent::next();
+    }
+
     public function rewind(): void
     {
-        if (false === $this->isRewindable()) {
+        // some streams like FTP are not rewindable, ignore the first rewind after creation,
+        // as newly created DirectoryIterator does not need to be rewound
+        if ($this->ignoreFirstRewind) {
+            $this->ignoreFirstRewind = false;
+
             return;
         }
 
         parent::rewind();
-    }
-
-    /**
-     * Checks if the stream is rewindable.
-     */
-    public function isRewindable(): bool
-    {
-        if (null !== $this->rewindable) {
-            return $this->rewindable;
-        }
-
-        if (false !== $stream = @opendir($this->getPath())) {
-            $infos = stream_get_meta_data($stream);
-            closedir($stream);
-
-            if ($infos['seekable']) {
-                return $this->rewindable = true;
-            }
-        }
-
-        return $this->rewindable = false;
     }
 }

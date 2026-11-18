@@ -31,10 +31,19 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
-    'zoom' => [
-        'client_id' => env('DPj_0xnqSsC5GXOdhdm8mw'),
-        'client_secret' => env('lq74oiK3qD0RTph5lv8f0FFxtRa141tD'),
-        'redirect' => env('http://127.0.0.1:8000/zoom/callback'),
+    // Web plagiarism search (https://brave.com/search/api/): $5 free credit a month ≈ 1,000 searches.
+    'brave' => [
+        'key' => env('BRAVE_SEARCH_API_KEY'),
+    ],
+
+    'telegram' => [
+        'token' => env('TELEGRAM_BOT_TOKEN'),
+        'username' => env('TELEGRAM_BOT_USERNAME'),
+        // Private channel or group (bot must be admin) where every file is kept.
+        'storage_chat_id' => env('TELEGRAM_STORAGE_CHAT_ID'),
+        // Comma-separated chat ids that are notified about submissions and may accept/reject them.
+        'admin_chat_ids' => array_values(array_filter(array_map('trim', explode(',', (string) env('TELEGRAM_ADMIN_CHAT_IDS', ''))))),
+        'webhook_secret' => env('TELEGRAM_WEBHOOK_SECRET'),
     ],
 
 ];

@@ -13,6 +13,7 @@ namespace Symfony\Component\Console\Command;
 
 use Symfony\Component\Console\Exception\LogicException;
 use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\Lock\LockInterface;
 use Symfony\Component\Lock\Store\FlockStore;
 use Symfony\Component\Lock\Store\SemaphoreStore;
 
@@ -23,15 +24,15 @@ use Symfony\Component\Lock\Store\SemaphoreStore;
  */
 trait LockableTrait
 {
-    private $lock = null;
+    private ?LockInterface $lock = null;
 
     /**
      * Locks a command.
      */
-    private function lock(string $name = null, bool $blocking = false): bool
+    private function lock(?string $name = null, bool $blocking = false): bool
     {
         if (!class_exists(SemaphoreStore::class)) {
-            throw new LogicException('To enable the locking feature you must install the symfony/lock component.');
+            throw new LogicException('To enable the locking feature you must install the symfony/lock component. Try running "composer require symfony/lock".');
         }
 
         if (null !== $this->lock) {
@@ -44,12 +45,12 @@ trait LockableTrait
             $store = new FlockStore();
         }
 
-        $this->lock = (new LockFactory($store))->createLock($name ?: $this->getName());
-        if (!$this->lock->acquire($blocking)) {
-            $this->lock = null;
-
+        $lock = (new LockFactory($store))->createLock($name ?: $this->getName());
+        if (!$lock->acquire($blocking)) {
             return false;
         }
+
+        $this->lock = $lock;
 
         return true;
     }
@@ -57,11 +58,11 @@ trait LockableTrait
     /**
      * Releases the command lock if there is one.
      */
-    private function release()
+    private function release(): void
     {
-        if ($this->lock) {
-            $this->lock->release();
+        if ($lock = $this->lock) {
             $this->lock = null;
+            $lock->release();
         }
     }
 }

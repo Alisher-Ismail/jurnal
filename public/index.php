@@ -5,6 +5,11 @@ use Illuminate\Http\Request;
 
 define('LARAVEL_START', microtime(true));
 
+// PHP 8.4 reports "Deprecated" notices for Laravel 9's own library files while they load,
+// before Laravel's error handler takes over; PHP wrote them to public/error_log on every request
+// (13,000+ lines in a week). Real errors are still reported and logged.
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
+
 /*
 |--------------------------------------------------------------------------
 | Check If The Application Is Under Maintenance

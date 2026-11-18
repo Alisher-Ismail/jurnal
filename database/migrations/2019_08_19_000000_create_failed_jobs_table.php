@@ -13,6 +13,11 @@ return new class extends Migration
      */
     public function up()
     {
+        // Production tables may already exist (created from an SQL dump); never fail on them.
+        if (Schema::hasTable('failed_jobs')) {
+            return;
+        }
+
         Schema::create('failed_jobs', function (Blueprint $table) {
             $table->id();
             $table->string('uuid')->unique();
