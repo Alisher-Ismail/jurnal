@@ -792,5 +792,6 @@
     "Switched on, but the bot cannot post in :channel yet (:reason). Make the bot an admin with the right to post messages.": "Включено, но бот пока не может писать в :channel (:reason). Сделайте бота администратором с правом публикации.",
     "Automatic channel posts are off.": "Автопубликация в канал выключена.",
     "Where PDF downloads came from": "Откуда скачивают PDF",
-    "From a page of this journal": "Со страницы журнала (кнопка PDF)"
+    "From a page of this journal": "Со страницы журнала (кнопка PDF)",
+    "The index is being updated by another task. Try again in a minute.": "Индекс сейчас обновляется другой задачей. Попробуйте через минуту."
 }

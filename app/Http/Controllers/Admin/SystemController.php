@@ -497,6 +497,9 @@ class SystemController extends Controller
             return back()->with('error', __('Run the database update first.'));
         }
         $result = $index->sync(45, true);
+        if ($result['busy'] ?? false) {
+            return back()->with('success', __('The index is being updated by another task. Try again in a minute.'));
+        }
 
         return back()->with('success', __('Indexed :n document(s). :p still waiting.', ['n' => $result['indexed'], 'p' => $result['pending']]));
     }

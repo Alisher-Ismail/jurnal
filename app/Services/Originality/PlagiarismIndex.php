@@ -8,6 +8,7 @@ use App\Models\Paper;
 use App\Models\PlagiarismDocument;
 use App\Services\FileVault;
 use App\Support\SchemaState;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -28,6 +29,22 @@ class PlagiarismIndex
      * @return array{indexed: int, pending: int, total: int}
      */
     public function sync(float $budgetSeconds = 40, bool $retryFailed = false): array
+    {
+        // One indexer at a time: the cron run and a submission's check used to index the same
+        // document together and the second insert failed ("Duplicate entry 'article-1110'").
+        $lock = Cache::lock('plagiarism-index-sync', (int) ceil($budgetSeconds) + 300);
+        if (! $lock->get()) {
+            return ['indexed' => 0, 'pending' => 0, 'total' => 0, 'busy' => true];
+        }
+
+        try {
+            return $this->syncLocked($budgetSeconds, $retryFailed);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function syncLocked(float $budgetSeconds, bool $retryFailed): array
     {
         $started = microtime(true);
         $candidates = $this->candidates();
