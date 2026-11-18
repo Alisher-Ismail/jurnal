@@ -32,7 +32,7 @@ class CorpusTest extends TestCase
         parent::setUp();
         Mail::fake();
         Storage::fake('local');
-        config(['journal.certificate_after_check' => true, 'journal.corpus.sampling' => 2, 'journal.corpus.from_year' => 2026]);
+        config(['journal.certificate_after_check' => true, 'journal.certificate_after_payment' => false, 'journal.corpus.sampling' => 2, 'journal.corpus.from_year' => 2026]);
     }
 
     private function inverted(string $text): array

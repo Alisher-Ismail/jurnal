@@ -63,8 +63,9 @@ class JournalTest extends TestCase
                 $this->get("/maqola$sfx/$id")->assertOk();
             }
         }
-        // Old author links had a leading space (%20ELMIRA...).
-        $this->get('/maqolaauthoreng/%20R.%20Bekmirzaev')->assertOk()->assertSee('Legacy one');
+        // Old author links had a leading space (%20ELMIRA...): one permanent redirect to the clean name.
+        $this->get('/maqolaauthoreng/%20R.%20Bekmirzaev')->assertStatus(301)->assertRedirect(lroute('maqolaauthor', 'R. Bekmirzaev', 'en'));
+        $this->get(lroute('maqolaauthor', 'R. Bekmirzaev', 'en'))->assertOk()->assertSee('Legacy one');
         $this->get('/files/article/'.Article::where('title', 'Legacy one')->value('id'))->assertNotFound();
     }
 
@@ -76,7 +77,7 @@ class JournalTest extends TestCase
         $this->get('/maqolaqidiruveng?search=nothing-like-this')->assertSee('Nothing found');
     }
 
-    public function test_web_submission_creates_paper_and_sends_certificate(): void
+    public function test_web_submission_creates_paper_and_sends_payment_details(): void
     {
         Mail::fake();
         Storage::fake('local');
@@ -86,7 +87,7 @@ class JournalTest extends TestCase
             'authors' => 'Aliyev Vali, Karimova Nodira',
             'email' => 'author@example.com',
             'abstract' => str_repeat('A careful study of irrigation water quality. ', 3),
-            'agree' => '1',
+            'agree' => '1', 'license' => '1',
             'file' => UploadedFile::fake()->create('paper.pdf', 200, 'application/pdf'),
         ]);
 
@@ -95,10 +96,11 @@ class JournalTest extends TestCase
         $this->assertSame('web', $paper->source);
         $this->assertSame(Paper::SUBMITTED, $paper->status);
         Storage::disk('local')->assertExists($paper->file_path);
-        $this->assertDatabaseHas('certificates', ['paper_id' => $paper->id, 'type' => Certificate::SUBMISSION]);
-
+        $this->assertNotNull($paper->license_agreed_at);
+        // Certificates wait for acceptance and payment: the author gets the payment details, no certificate yet.
+        $this->assertDatabaseMissing('certificates', ['paper_id' => $paper->id]);
         Mail::assertSent(PaperUpdateMail::class, fn ($mail) => $mail->hasTo('author@example.com')
-            && $mail->event === 'submitted' && $mail->certificatePdf !== null);
+            && $mail->event === 'received_pay' && $mail->certificatePdf === null);
 
         $this->get(route('papers.show', $paper))->assertOk()->assertSee($paper->code);
         $this->get('/track?code='.strtolower($paper->code))->assertRedirect(route('papers.show', $paper));
@@ -174,8 +176,15 @@ class JournalTest extends TestCase
         $this->assertSame('A paper (final)', $paper->article->title);
         $this->assertSame((string) $issue->id, (string) $paper->article->volume);
         $this->assertDatabaseHas('author', ['name' => 'Author Three']);
+        // Published: the author gets the link and the payment details; the certificate waits for the payment.
+        $this->assertDatabaseMissing('certificates', ['article_id' => $paper->article_id]);
+        Mail::assertSent(PaperUpdateMail::class, fn ($m) => $m->event === 'accepted_pay' && $m->hasTo('one@example.com') && $m->certificatePdf === null);
+
+        // The administrator confirms the payment: now the publication certificate goes out.
+        $this->actingAs($admin)->post(route('admin.papers.payment', $paper))->assertSessionHas('success');
+        $this->assertNotNull($paper->fresh()->paid_at);
         $this->assertDatabaseHas('certificates', ['article_id' => $paper->article_id, 'type' => Certificate::PUBLICATION]);
-        Mail::assertSent(PaperUpdateMail::class, fn ($m) => $m->event === 'accepted' && $m->hasTo('one@example.com'));
+        Mail::assertSent(PaperUpdateMail::class, fn ($m) => $m->event === 'paid' && $m->hasTo('one@example.com') && $m->certificatePdf !== null);
 
         $this->actingAs($admin)->post(route('admin.papers.reject', $other), ['note' => 'Out of scope'])->assertRedirect();
         $this->assertSame(Paper::REJECTED, $other->fresh()->status);

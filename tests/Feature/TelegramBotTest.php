@@ -120,7 +120,10 @@ class TelegramBotTest extends TestCase
         $this->assertSame(77, (int) $paper->storage_message_id);
 
         $this->assertTrue($this->sentTo(self::STORAGE, 'sendDocument')->isNotEmpty(), 'Copied to storage chat');
-        $this->assertTrue($this->sentTo(self::USER, 'sendDocument')->isNotEmpty(), 'Certificate sent to the author');
+        // No certificate at submission: the author gets the tracking code and the payment details.
+        $this->assertTrue($this->sentTo(self::USER, 'sendDocument')->isEmpty(), 'No certificate before acceptance and payment');
+        $this->assertTrue($this->sentTo(self::USER, 'sendMessage')
+            ->contains(fn (Request $r) => str_contains($r->data()['text'] ?? '', $paper->code)), 'Author told the tracking code');
         $this->assertTrue($this->sentTo(self::EDITOR, 'sendDocument')->isNotEmpty(), 'Editors notified');
         $this->assertNull(TelegramChat::where('chat_id', self::USER)->value('state'));
     }
@@ -140,7 +143,13 @@ class TelegramBotTest extends TestCase
         $paper->refresh();
         $this->assertSame(Paper::ACCEPTED, $paper->status);
         $this->assertSame('STORED-FILE-ID', $paper->article->pdf_file_id, 'Article PDF stays in Telegram');
-        $this->assertTrue($this->sentTo(self::USER, 'sendDocument')->isNotEmpty(), 'Publication certificate delivered');
+        // Published: the author gets the link; the certificate waits for the payment.
+        $this->assertTrue($this->sentTo(self::USER, 'sendDocument')->isEmpty(), 'No certificate before payment');
+        $this->assertTrue($this->sentTo(self::USER, 'sendMessage')
+            ->contains(fn (Request $r) => str_contains($r->data()['text'] ?? '', (string) $paper->article_id)), 'Article link delivered');
+
+        app(\App\Services\PaperService::class)->confirmPayment($paper, 'Admin');
+        $this->assertTrue($this->sentTo(self::USER, 'sendDocument')->isNotEmpty(), 'Publication certificate delivered after payment');
     }
 
     public function test_editor_rejects_with_a_comment(): void
@@ -177,6 +186,9 @@ class TelegramBotTest extends TestCase
         $this->text('/start p_'.$paper->code);
 
         $this->assertSame(self::USER, (int) $paper->fresh()->telegram_chat_id);
-        $this->assertTrue($this->sentTo(self::USER, 'sendDocument')->isNotEmpty(), 'Submission certificate delivered');
+        // Linked; there is no certificate yet, the author is told it follows acceptance and payment.
+        $this->assertTrue($this->sentTo(self::USER, 'sendDocument')->isEmpty(), 'No certificate before acceptance and payment');
+        $this->assertTrue($this->sentTo(self::USER, 'sendMessage')
+            ->contains(fn (Request $r) => str_contains($r->data()['text'] ?? '', 'payment is confirmed')), 'Author told when the certificate comes');
     }
 }

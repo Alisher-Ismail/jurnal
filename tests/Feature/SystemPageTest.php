@@ -39,14 +39,14 @@ class SystemPageTest extends TestCase
         $this->actingAs($admin)->get(route('admin.papers.show', $paper))->assertOk();
         $this->get(route('papers.show', $paper))->assertOk();
 
-        // A submission still gets its certificate (the check is skipped until the tables exist).
+        // A submission still goes through and the author is answered (the check is skipped until the tables exist).
         config(['journal.certificate_after_check' => true]);
         $this->post('/papers', [
             'title' => 'New paper', 'authors' => 'B. Author', 'email' => 'b@example.com',
-            'abstract' => str_repeat('An abstract long enough for validation. ', 3), 'agree' => '1',
+            'abstract' => str_repeat('An abstract long enough for validation. ', 3), 'agree' => '1', 'license' => '1',
             'file' => \Illuminate\Http\UploadedFile::fake()->create('p.pdf', 50, 'application/pdf'),
         ])->assertRedirect();
-        Mail::assertSent(\App\Mail\PaperUpdateMail::class, fn ($m) => $m->event === 'submitted');
+        Mail::assertSent(\App\Mail\PaperUpdateMail::class, fn ($m) => $m->event === 'received_pay' && $m->hasTo('b@example.com'));
 
         $this->actingAs($admin)->post('/panel/system/migrate')->assertSessionHas('success');
         $this->assertTrue(\App\Support\SchemaState::originalityReady());

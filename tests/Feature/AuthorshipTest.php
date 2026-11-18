@@ -34,7 +34,9 @@ class AuthorshipTest extends TestCase
         Mail::fake();
         Storage::fake('local');
         Storage::fake('public');
-        config(['journal.certificate_after_check' => true]);
+        // These tests cover the submission certificate that follows the originality check, which is
+        // only issued when publication certificates do not wait for payment (the default since 2026-11-17).
+        config(['journal.certificate_after_check' => true, 'journal.certificate_after_payment' => false]);
     }
 
     private function pdf(string $html): string
@@ -56,7 +58,7 @@ class AuthorshipTest extends TestCase
     {
         $this->post('/papers', [
             'title' => 'Chiqindi yigʻuvchi robot', 'authors' => $authors, 'email' => $email,
-            'abstract' => str_repeat('Robot chiqindilarni yigʻadi va masofadan boshqariladi. ', 3), 'agree' => '1',
+            'abstract' => str_repeat('Robot chiqindilarni yigʻadi va masofadan boshqariladi. ', 3), 'agree' => '1', 'license' => '1',
             'file' => $this->docx(str_repeat(self::BODY, 4)),
         ])->assertRedirect();
 
@@ -117,7 +119,7 @@ class AuthorshipTest extends TestCase
         $this->publishArticle();
         $this->post('/papers', [
             'title' => 'Boshqa mavzu', 'authors' => 'Karimov Bekzod', 'email' => 'b@example.com',
-            'abstract' => str_repeat('Kichik korxonalarda raqamli toʻlovlar oʻrganildi. ', 3), 'agree' => '1',
+            'abstract' => str_repeat('Kichik korxonalarda raqamli toʻlovlar oʻrganildi. ', 3), 'agree' => '1', 'license' => '1',
             'file' => $this->docx(str_repeat('Andijon viloyatidagi kichik korxonalarning raqamli toʻlov tizimlaridan foydalanish darajasi soʻrovnoma asosida oʻrganildi va tahlil qilindi. ', 6)),
         ]);
         $paper = Paper::latest('id')->first();
