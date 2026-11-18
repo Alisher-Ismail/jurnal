@@ -12,6 +12,7 @@
 namespace Symfony\Component\HttpFoundation;
 
 use Symfony\Component\Routing\RequestContext;
+use Symfony\Component\Routing\RequestContextAwareInterface;
 
 /**
  * A helper service for manipulating URLs within and outside the request scope.
@@ -20,18 +21,15 @@ use Symfony\Component\Routing\RequestContext;
  */
 final class UrlHelper
 {
-    private $requestStack;
-    private $requestContext;
-
-    public function __construct(RequestStack $requestStack, RequestContext $requestContext = null)
-    {
-        $this->requestStack = $requestStack;
-        $this->requestContext = $requestContext;
+    public function __construct(
+        private RequestStack $requestStack,
+        private RequestContextAwareInterface|RequestContext|null $requestContext = null,
+    ) {
     }
 
     public function getAbsoluteUrl(string $path): string
     {
-        if (str_contains($path, '://') || '//' === substr($path, 0, 2)) {
+        if (str_contains($path, '://') || str_starts_with($path, '//') || preg_match('/^[a-z][a-z0-9+.-]*:/i', $path)) {
             return $path;
         }
 
@@ -39,10 +37,20 @@ final class UrlHelper
             return $this->getAbsoluteUrlFromContext($path);
         }
 
-        if ('#' === $path[0]) {
-            $path = $request->getRequestUri().$path;
-        } elseif ('?' === $path[0]) {
-            $path = $request->getPathInfo().$path;
+        if ('' === $path || '#' === $path[0] || '?' === $path[0]) {
+            [$requestPath, $queryString] = explode('?', $request->getRequestUri(), 2) + [1 => null];
+            $pathInfo = $request->getPathInfo();
+
+            // the path info of "/index.php" is "/", but the URL has no slash after the base URL
+            if (!str_ends_with($requestPath, $pathInfo)) {
+                $pathInfo = substr($pathInfo, 1);
+            }
+
+            if (null !== $queryString && !str_starts_with($path, '?')) {
+                $path = '?'.$queryString.$path;
+            }
+
+            $path = $request->getBaseUrl().$pathInfo.$path;
         }
 
         if (!$path || '/' !== $path[0]) {
@@ -60,7 +68,7 @@ final class UrlHelper
 
     public function getRelativePath(string $path): string
     {
-        if (str_contains($path, '://') || '//' === substr($path, 0, 2)) {
+        if (str_contains($path, '://') || str_starts_with($path, '//')) {
             return $path;
         }
 
@@ -73,28 +81,40 @@ final class UrlHelper
 
     private function getAbsoluteUrlFromContext(string $path): string
     {
-        if (null === $this->requestContext || '' === $host = $this->requestContext->getHost()) {
+        if (null === $context = $this->requestContext) {
             return $path;
         }
 
-        $scheme = $this->requestContext->getScheme();
-        $port = '';
-
-        if ('http' === $scheme && 80 !== $this->requestContext->getHttpPort()) {
-            $port = ':'.$this->requestContext->getHttpPort();
-        } elseif ('https' === $scheme && 443 !== $this->requestContext->getHttpsPort()) {
-            $port = ':'.$this->requestContext->getHttpsPort();
+        if ($context instanceof RequestContextAwareInterface) {
+            $context = $context->getContext();
         }
 
-        if ('#' === $path[0]) {
-            $queryString = $this->requestContext->getQueryString();
-            $path = $this->requestContext->getPathInfo().($queryString ? '?'.$queryString : '').$path;
+        if ('' === $host = $context->getHost()) {
+            return $path;
+        }
+
+        $scheme = $context->getScheme();
+        $port = '';
+
+        if ('http' === $scheme && 80 !== $context->getHttpPort()) {
+            $port = ':'.$context->getHttpPort();
+        } elseif ('https' === $scheme && 443 !== $context->getHttpsPort()) {
+            $port = ':'.$context->getHttpsPort();
+        }
+
+        $isCurrentPathReference = '' === $path || str_starts_with($path, '#') || str_starts_with($path, '?');
+
+        if ('' === $path || '#' === $path[0]) {
+            $queryString = $context->getQueryString();
+            $path = $context->getPathInfo().($queryString ? '?'.$queryString : '').$path;
         } elseif ('?' === $path[0]) {
-            $path = $this->requestContext->getPathInfo().$path;
+            $path = $context->getPathInfo().$path;
         }
 
         if ('/' !== $path[0]) {
-            $path = rtrim($this->requestContext->getBaseUrl(), '/').'/'.$path;
+            $path = rtrim($context->getBaseUrl(), '/').'/'.$path;
+        } elseif ($isCurrentPathReference) {
+            $path = $context->getBaseUrl().$path;
         }
 
         return $scheme.'://'.$host.$port.$path;

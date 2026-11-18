@@ -13,6 +13,9 @@ return new class extends Migration
      */
     public function up()
 {
+    if (Schema::hasColumn('users', 'zoom_token')) {
+        return;
+    }
     Schema::table('users', function (Blueprint $table) {
         $table->string('zoom_token')->nullable();
     });

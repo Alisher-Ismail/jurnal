@@ -1,0 +1,46 @@
+# The hosting serves this whole folder, but only public/ is meant to be on the web.
+# Without these rules .env backups, storage/logs, journal.sql (with password hashes),
+# vendor/ and the source code can be downloaded by anyone.
+# Site URLs (https://journal.emro.uz/public/...) and the root redirect page keep working.
+
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # The bare domain opens the site in the browser's language: Uzbek, Russian (also for
+    # Belarusian, Ukrainian, Kazakh, Kyrgyz and Tajik browsers), otherwise English.
+    RewriteCond %{HTTP:Accept-Language} ^uz [NC]
+    RewriteCond %{REQUEST_URI} ^(.*/)(index\.(html?|php))?$
+    RewriteRule ^(index\.(html?|php))?$ %1public/ [R=302,L,E=LANGREDIR:1]
+    RewriteCond %{HTTP:Accept-Language} ^(ru|be|uk|kk|ky|tg) [NC]
+    RewriteCond %{REQUEST_URI} ^(.*/)(index\.(html?|php))?$
+    RewriteRule ^(index\.(html?|php))?$ %1public/ru [R=302,L,E=LANGREDIR:1]
+    RewriteCond %{REQUEST_URI} ^(.*/)(index\.(html?|php))?$
+    RewriteRule ^(index\.(html?|php))?$ %1public/eng [R=302,L,E=LANGREDIR:1]
+
+    # robots.txt must live at the domain root; it names the sitemap.
+    RewriteRule ^robots\.txt$ public/robots.txt [L]
+
+    # Search engine site-verification files (Yandex, Google, Bing) and the IndexNow key also live in public/.
+    RewriteRule ^(yandex_[0-9a-f]+\.html|google[0-9a-f]+\.html|BingSiteAuth\.xml|[0-9a-f]{32}\.txt)$ public/$1 [L]
+
+    # Allowed: everything under public/ and certificate renewal checks.
+    RewriteRule ^public(/.*)?$ - [L]
+    RewriteRule ^\.well-known/ - [L]
+
+    # Everything else (app/, storage/, vendor/, .env, *.sql, composer.json ...) is forbidden.
+    RewriteRule ^ - [F]
+</IfModule>
+
+# The language redirect differs per visitor: no shared caching of it.
+<IfModule mod_headers.c>
+    Header always set Vary "Accept-Language" env=LANGREDIR
+    Header always set Cache-Control "private, no-store" env=LANGREDIR
+</IfModule>
+
+<IfModule !mod_rewrite.c>
+    <FilesMatch "\.(env|sql|log|json|lock|md|xml|yml|yaml|sh)$|^artisan$">
+        Require all denied
+    </FilesMatch>
+</IfModule>

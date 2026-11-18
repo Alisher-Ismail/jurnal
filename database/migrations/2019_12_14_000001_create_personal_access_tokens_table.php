@@ -13,6 +13,11 @@ return new class extends Migration
      */
     public function up()
     {
+        // Production tables may already exist (created from an SQL dump); never fail on them.
+        if (Schema::hasTable('personal_access_tokens')) {
+            return;
+        }
+
         Schema::create('personal_access_tokens', function (Blueprint $table) {
             $table->id();
             $table->morphs('tokenable');

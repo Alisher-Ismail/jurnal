@@ -1,95 +1,44 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ app()->getLocale() }}">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>U-Science Journal</title>
-
-    <meta name="description" content="U-Science Journal">
-    <meta name="author" content="alisher ismailov shakirovich">
-    <meta name="keywords" content="dasturlash, dastur, programming, urobot, urobot.uz, o`zbek dasturchi">
-    <meta name="citation_journal_title" content="U-science journal">
-    <meta name="citation_volume" content="1">
-  <!-- Google Font: Source Sans Pro -->
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback">
-  <!-- Font Awesome -->
-  <link rel="stylesheet" href="{{asset('admin/plugins/fontawesome-free/css/all.min.css')}}">
-  <!-- icheck bootstrap -->
-  <link rel="stylesheet" href="{{asset('admin/plugins/icheck-bootstrap/icheck-bootstrap.min.css')}}">
-  <!-- Theme style -->
-  <link rel="stylesheet" href="{{asset('admin/dist/css/adminlte.min.css')}}">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex">
+    <title>{{ __('Log in') }} · {{ config('journal.short_name') }}</title>
+    <link rel="icon" href="{{ asset('admin/dist/img/journalicon.png') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ asset('css/site.css') }}?v={{ @filemtime(public_path('css/site.css')) ?: 4 }}">
+    <link rel="stylesheet" href="{{ asset('css/admin.css') }}?v=2">
 </head>
-<body class="hold-transition login-page">
-<div class="login-box">
-  <!-- /.login-logo -->
-  <div class="card card-outline card-primary">
-    <div class="card-header text-center">
-    <a href="{{route('adminhome')}}" class="h1">U-Science Journal</a>
-    </div>
-    @if($errors->any())
-                                            <div class="col-12">
-                                                @foreach($errors->all() as $err)
-                                                    <div class="alert alert-danger">
-                                                        {{$err}}
-                                                    </div>
-                                                @endforeach
-                                            </div>
-                                        @endif
+<body>
+<div class="login-wrap">
+    <form class="card login-card" method="post" action="{{ route('adminlogin.post') }}">
+        @csrf
+        <a href="{{ lroute('maqolabosh') }}" class="brand" style="margin-bottom:26px">
+            <span class="brand-mark"><x-mark/></span>
+            <span class="brand-name"><strong>{{ config('journal.short_name') }}</strong><span>{{ __('Admin panel') }}</span></span>
+        </a>
+        <h1 style="font-size:24px;margin-bottom:6px">{{ __('Log in') }}</h1>
+        <p class="muted small" style="margin-bottom:22px">{{ __('Editors and administrators only.') }}</p>
 
-                                        @if(session()->has('error'))
-                                            <div class="alert alert-danger">
-                                                {{session('error')}}
-                                            </div>
-                                        @endif
+        @if (session('error'))
+            <div class="alert alert-bad"><x-icon name="alert"/><span>{{ session('error') }}</span></div>
+        @endif
+        @if ($errors->any())
+            <div class="alert alert-bad"><x-icon name="alert"/><span>{{ $errors->first() }}</span></div>
+        @endif
 
-                                        @if(session()->has('success'))
-                                            <div class="alert alert-success">
-                                                {{session('success')}}
-                                            </div>
-                                        @endif
-    <div class="card-body">
-
-      <p class="login-box-msg">Dasturga Kirish Uchun Login Qiling</p>
-
-      <form method="post" action="{{route('adminlogin.post')}}" id="add-form">
-      @csrf
-        <div class="input-group mb-3">
-          <input type="text" name="email" class="form-control" placeholder="Email">
-          <div class="input-group-append">
-            <div class="input-group-text">
-              <span class="fas fa-envelope"></span>
-            </div>
-          </div>
+        <div class="field" style="margin-bottom:14px">
+            <label for="email">{{ __('E-mail') }}</label>
+            <input class="input" id="email" name="email" value="{{ old('email') }}" autocomplete="username" required autofocus>
         </div>
-        <div class="input-group mb-3">
-          <input type="password" name="password" class="form-control" placeholder="Password">
-          <div class="input-group-append">
-            <div class="input-group-text">
-              <span class="fas fa-lock"></span>
-            </div>
-          </div>
+        <div class="field" style="margin-bottom:14px">
+            <label for="password">{{ __('Password') }}</label>
+            <input class="input" type="password" id="password" name="password" autocomplete="current-password" required>
         </div>
-        <div class="row">
-          <!-- /.col -->
-          <div class="col-4">
-            <button type="submit" class="btn btn-primary btn-block">Login</button>
-          </div>
-          <!-- /.col -->
-        </div>
-      </form>
-      <!-- /.social-auth-links -->
-    </div>
-    <!-- /.card-body -->
-  </div>
-  <!-- /.card -->
+        <label class="check" style="margin-bottom:22px"><input type="checkbox" name="remember" value="1"> <span>{{ __('Remember me') }}</span></label>
+        <button class="btn btn-primary" style="width:100%" type="submit"><x-icon name="lock"/> {{ __('Log in') }}</button>
+    </form>
 </div>
-<!-- /.login-box -->
-
-<!-- jQuery -->
-<script src="{{asset('admin/plugins/jquery/jquery.min.js')}}"></script>
-<!-- Bootstrap 4 -->
-<script src="{{asset('admin/plugins/bootstrap/js/bootstrap.bundle.min.js')}}"></script>
-<!-- AdminLTE App -->
-<script src="{{asset('admin/dist/js/adminlte.min.js')}}"></script>
 </body>
 </html>

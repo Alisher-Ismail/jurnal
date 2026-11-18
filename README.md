@@ -1,70 +1,87 @@
-<<<<<<< HEAD
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Emro Science — journal website + Telegram bot
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Laravel 9 site for the *Emro Science and Education* journal (journal.emro.uz).
 
-## About Laravel
+- Public site in **Uzbek / English / Russian**: landing page, archive, issues, articles (Google Scholar meta tags), search, author pages, editable info pages.
+- **Paper submission** from the website or the **Telegram bot**. Every submission instantly gets a **PDF certificate with a QR code**. The QR code opens a public verification page. Certificates are delivered by e-mail and/or Telegram.
+- **Admin panel** (`/panel`): review, accept (publish into an issue), reject, resend certificates, manage issues, articles, authors and page texts. Publication certificates can also be issued for papers published before the online system existed.
+- **Every downloaded PDF carries the journal header and footer** (journal name, issue, publication date, permanent link, page number), stamped on the fly. Originals are never modified, and stamped copies are cached in `storage/app/stamped` (*Panel → System → Clear cache* rebuilds them). Word 2016+ PDFs with compressed object streams are handled by `PdfNormalizer`. Encrypted or broken PDFs, and files over 60 MB, are served unchanged.
+- **Originality check for editors** (Panel → submission → *Originality*): runs automatically after each submission.
+  - *Archive similarity*: winnowed 5-word fingerprints compared with every issue, article and earlier submission, with sources and matching passages.
+  - *Web*: about 8 distinctive sentences searched as exact phrases via Brave Search API (`BRAVE_SEARCH_API_KEY`; $5 free credit a month ≈ 1,000 searches, capped by `JOURNAL_WEB_CHECK_MONTHLY_LIMIT`).
+  - *AI-writing indicator*: built-in style statistics (sentence-length uniformity, stock phrases in en/ru/uz, connective openers, repetitive openings, vocabulary evenness). It runs on the server only, and it is a hint, not proof.
+  - Build the archive index once with *Panel → System → Build index*.
+  - *Authorship protection*: when a submission largely matches an indexed text (≥ `JOURNAL_AUTHORSHIP_MATCH_PERCENT`, default 25%), the authors are compared, across Latin/Cyrillic and spelling variants. Proceedings PDFs are checked against the names printed in the matched article's title block. If the text belongs to other authors, or most sentences are found on the web, the **submission certificate is held** until an editor clicks *Verified — issue certificate* (`JOURNAL_CERTIFICATE_AFTER_CHECK=true`, the default). Tested on 86 real articles: 86/86 outsiders stopped, 85/86 real authors cleared automatically.
+  - *Uzbek publications corpus (free)*: titles, authors and abstracts of about 388,000 works by Uzbek researchers and in Uzbek journals since 2015, harvested from [OpenAlex](https://openalex.org) open data, with no key needed. A cPanel cron job calls `/cron/<CRON_SECRET>` every 5 minutes (or press *Panel → System → Download next batch*). The first download takes about 10 hours of cron runs and about 350 MB of database; after that, the last 120 days are refreshed daily. When a submission contains most of a published abstract (≥ `JOURNAL_CORPUS_MATCH_COVERAGE`, default 50%) and the submitter is not among that work's authors, it is an authorship conflict and the certificate is held. Tested on real works: 25/25 outsiders caught, 25/25 real authors cleared.
+  - *antiplag.uz* has no API, and its terms forbid reselling access. Editors can record a manual antiplag.uz result (similarity %, AI %, report file) on each submission.
+- **Files live in Telegram**: uploads are posted to a private storage channel and served back by `file_id`. If Telegram isn't configured, files fall back to the server disk.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Old URLs (`/maqola/5`, `/maqolaeng/5`, `/maqolavolumeru/3`, `/haqimiz` …) keep working.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Setup
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+```bash
+composer install
+cp .env.example .env        # then fill in DB_*, MAIL_*, TELEGRAM_*
+php artisan key:generate
+php artisan migrate
+php artisan admin:create you@example.com --name="Editor"   # asks for a password
+```
 
-## Learning Laravel
+Requires PHP 8.1+ with `gd`, `mbstring`, `fileinfo`, `pdo_mysql`.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+> Composer blocks Laravel 9 because of published security advisories, so `composer.json` sets `audit.block-insecure: false`.
+> The proper fix is moving to PHP 8.2+ and Laravel 11/12.
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+## Telegram setup
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains over 2000 video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+1. **Create the bot**: talk to [@BotFather](https://t.me/BotFather), `/newbot`, then copy the token into `TELEGRAM_BOT_TOKEN` and the username (without `@`) into `TELEGRAM_BOT_USERNAME`.
+2. **Storage channel** (where every file is kept): create a *private* channel, add the bot as **administrator**, post anything, and get its id (it looks like `-100…`). One way to get the id: forward a post from the channel to [@userinfobot](https://t.me/userinfobot). Put it in `TELEGRAM_STORAGE_CHAT_ID`.
+3. **Editors**: put the Telegram user ids (or a group id) of editors in `TELEGRAM_ADMIN_CHAT_IDS`, comma separated. They receive every new submission with **Review / Accept / Reject** buttons, and can send `/pending` to the bot.
+4. **Connect the bot**:
+   - Production (HTTPS): set `TELEGRAM_WEBHOOK_SECRET` to a long random string, then run `php artisan telegram:webhook`.
+   - Local development: run `php artisan telegram:poll` (long polling; no public URL needed). Keep it running.
+5. Optional: copy existing PDFs (up to 20 MB) into the channel with `php artisan files:to-telegram` (`--dry-run` to preview). Local files are kept, because old `/public/storage/pdfs/...` links are indexed by Google Scholar.
 
-## Laravel Sponsors
+Telegram limits: bots can only download files up to **20 MB**. Paper submissions are capped at 20 MB; issue and article PDFs uploaded by editors can be up to 100 MB, and anything over 20 MB stays on the server. See DEPLOY.md for upgrading the live site.
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the Laravel [Patreon page](https://patreon.com/taylorotwell).
+### What the bot does
 
-### Premium Partners
+| Users | Editors (ids in `TELEGRAM_ADMIN_CHAT_IDS`) |
+|---|---|
+| 📝 Submit a paper step by step (title, authors, organisation, e-mail, abstract, keywords, file) | New submission with the file and buttons |
+| 📜 Certificate with QR code sent immediately | 🔍 Review → author is notified |
+| 📂 My papers: status, links, certificates | ✅ Accept → choose issue → article is published, author gets link + publication certificate |
+| 🔎 Find a published paper → permanent link + certificate | ❌ Reject → optional comment for the author |
+| 🌐 Language: Uzbek / English / Russian | `/pending`: list of open submissions |
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Cubet Techno Labs](https://cubettech.com)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[Many](https://www.many.co.uk)**
-- **[Webdock, Fast VPS Hosting](https://www.webdock.io/en)**
-- **[DevSquad](https://devsquad.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[OP.GG](https://op.gg)**
-- **[WebReinvent](https://webreinvent.com/?utm_source=laravel&utm_medium=github&utm_campaign=patreon-sponsors)**
-- **[Lendio](https://lendio.com)**
+Authors who submit on the website get a *Connect Telegram* button (`t.me/<bot>?start=p_<code>`). It links their submission to the chat and delivers the certificate there.
 
-## Contributing
+## E-mail
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Set `MAIL_MAILER=smtp` and the `MAIL_*` values (for example a Gmail app password, or Mailgun). With `MAIL_MAILER=log`, mails are written to `storage/logs/laravel.log`.
 
-## Code of Conduct
+## Useful commands
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+No terminal on the hosting? **Panel → System** runs the database update, connects the Telegram webhook, copies PDFs to Telegram, clears the cache and shows which PDFs are missing. **Panel → Account** changes passwords and manages editors.
 
-## Security Vulnerabilities
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+| Command | Purpose |
+|---|---|
+| `php artisan admin:create email [--name=] [--password=]` | Create an admin or reset their password |
+| `php artisan telegram:poll` | Run the bot locally |
+| `php artisan telegram:webhook [--delete]` | Register or remove the production webhook |
+| `php artisan files:to-telegram [--dry-run]` | Copy legacy PDFs (≤ 20 MB) to the storage channel |
+| `php artisan files:check [--missing]` | Show where each PDF is found, or which are missing |
+| `php artisan test` | Feature tests (in-memory SQLite, Telegram faked) |
 
-## License
+## Structure
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
-=======
-# jurnal
->>>>>>> 5e11261c0e3695362b45046ced50da73e9f4821d
+- `routes/web.php`: public routes registered once per language; admin under `/panel`.
+- `app/Services/PaperService.php`: submit / review / accept / reject plus notifications.
+- `app/Services/Telegram/BotHandler.php`: bot conversation and editor actions.
+- `app/Services/FileVault.php`: Telegram file storage with local fallback.
+- `app/Services/CertificateService.php`: certificate PDF (dompdf) and QR code.
+- `app/Support/PageContent.php`: editable pages (`about`, `abouteng`, `aboutru` …).
+- `lang/uz.json`, `lang/ru.json`: translations (English strings are the keys).
+- `resources/views/site`, `resources/views/admin`, `public/css/site.css`, `public/css/admin.css`: UI.

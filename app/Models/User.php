@@ -46,4 +46,15 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
     ];
+
+    public const ADMIN = 'admin';
+
+    /** Reviews papers and decides on them; no deleting, payments, settings, issues or pages. */
+    public const EDITOR = 'editor';
+
+    /** Every account made before roles existed is an administrator. */
+    public function isAdmin(): bool
+    {
+        return $this->type !== self::EDITOR;
+    }
 }

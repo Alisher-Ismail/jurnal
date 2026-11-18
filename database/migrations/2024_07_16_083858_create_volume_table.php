@@ -13,6 +13,11 @@ return new class extends Migration
      */
     public function up()
     {
+        // Production tables may already exist (created from an SQL dump); never fail on them.
+        if (Schema::hasTable('volume')) {
+            return;
+        }
+
         Schema::create('volume', function (Blueprint $table) {
             $table->id();
             $table->string('name');

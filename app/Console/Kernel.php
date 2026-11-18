@@ -15,7 +15,8 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
-        // $schedule->command('inspire')->hourly();
+        $schedule->command('corpus:harvest --seconds=240')->everyFiveMinutes()->withoutOverlapping(10);
+        $schedule->command('files:to-telegram --seconds=120')->hourly()->withoutOverlapping(10);
     }
 
     /**
